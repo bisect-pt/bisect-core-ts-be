@@ -1,6 +1,6 @@
 {
   "name": "@bisect/bisect-core-ts-be",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Core functionality for backends in Typescript",
   "author": "Bisect Lda. <info@bisect.pt> (www.bisect.pt)",
   "contributors": [
@@ -31,6 +31,6 @@
   },
   "dependencies": {
     "amqplib": "^0.6.0",
-    "@bisect/bisect-core-ts": "^0.0.0"
+    "@bisect/bisect-core-ts": "^0.1.0"
   }
 }
