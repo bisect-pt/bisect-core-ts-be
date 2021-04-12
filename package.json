@@ -11,8 +11,8 @@
   ],
   "license": "MIT",
   "private": false,
-  "main": "dist/bisect-core-ts-be/src/index.js",
-  "types": "dist/bisect-core-ts-be/src/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
     "**/*"
   ],
