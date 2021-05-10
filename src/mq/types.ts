@@ -10,7 +10,7 @@ export interface IQueueInfo {
 
 export interface IExchangeInfo {
     name: string;
-    type: 'direct' | 'topic' | 'headers' | 'fanout' | 'match', 
+    type: 'direct' | 'topic' | 'headers' | 'fanout' | 'match';
     options: Options.AssertExchange;
     keys: string[];
 }
