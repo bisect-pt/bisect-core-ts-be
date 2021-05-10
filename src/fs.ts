@@ -19,7 +19,7 @@ export async function recreateDirectory(path: string): Promise<void> {
         const rmOptions: fs.RmDirOptions = {
             recursive: true,
         };
-        fs.promises.rm(path, { recursive: true, force: true });
+        await fs.promises.rm(path, { recursive: true, force: true });
     } catch (e) {
         if (e.code !== 'ENOENT') {
             // The error is not file does not exist.
