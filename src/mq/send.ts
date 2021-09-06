@@ -22,6 +22,13 @@ type GenericSenderType<MessageType> = {
     close: () => void;
 };
 
+const isErrnoExceptionWithMessage = (e: unknown): e is NodeJS.ErrnoException => {
+    if ((e as NodeJS.ErrnoException).message !== undefined) {
+        return false;
+    }
+    return true;
+};
+
 const createQueuePipe = async (brokerUrl: string, queue: types.IQueueInfo): Promise<IQueuePipe> => {
     const { channel, close } = await setupChannel(brokerUrl);
 
@@ -74,9 +81,15 @@ class GenericSender<MessageType, SenderType extends GenericSenderType<MessageTyp
 
             return true;
         } catch (err) {
-            logger.error(`Error sending to target: ${err.message}`);
+            if (isErrnoExceptionWithMessage(err)) {
+                logger.error(`Error sending to target: ${err.message}`);
 
-            this.sender = null;
+                this.sender = null;
+            } else {
+                logger.error(`Error sending to target: ${err}`);
+
+                this.sender = null;
+            }
         }
 
         return false;
