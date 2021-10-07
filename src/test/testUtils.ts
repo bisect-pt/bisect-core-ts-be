@@ -1,6 +1,29 @@
 import { green, white, bgRed, red } from 'colors/safe';
 import cliProgress from 'cli-progress';
 import ConsoleProxy, { IConsoleMessage, ConsoleStream } from './consoleProxy';
+import fs from 'fs';
+import util from 'util';
+import path from 'path';
+import { DateTime } from 'luxon';
+import { once } from 'events';
+import * as stream from 'stream';
+
+const finished = util.promisify(stream.finished); // (A)
+
+async function writeIterableToFile(iterable: string[], filePath: string) {
+    const writable = fs.createWriteStream(filePath, { encoding: 'utf8' });
+    for await (const chunk of iterable) {
+        if (!writable.write(chunk)) {
+            // (B)
+            // Handle backpressure
+            await once(writable, 'drain');
+        }
+    }
+    writable.end(); // (C)
+    // Wait until done. Throws if there are errors.
+    await finished(writable);
+}
+const mkdir = util.promisify(fs.mkdir);
 
 function dumpMessages(messages: IConsoleMessage[]): void {
     messages.forEach((message) => {
@@ -31,6 +54,19 @@ export interface ITestSettings {
 
 export interface ITestContext {
     readonly settings: ITestSettings;
+
+    // Writes a string to a file on a folder created for this test run.
+    // The path to the file will be relative to that folder,
+    // and will contain the components specified in the path argument.
+    // The folders will be created under '/tmp/bisect-tests/<date and time>/<test name>/
+    // The string will be written in 'UTF-8'.
+    // Returns the path to the file.
+    //
+    // E.g.
+    // const path = await context.writeToFile('output/expected.json', JSON.stringify(data));
+    //
+    // Will create a 'output' directory with a 'expected.json' file and return the path to that file.
+    writeToFile(path: string, content: string): Promise<string>;
 }
 
 export type TestFunction = (context: ITestContext) => Promise<void>;
@@ -99,13 +135,26 @@ const runTest = async (
     t: ITestEntry,
     settings: ITestSettings,
     onTestSucceeded: (result: ITestSuccess) => void,
-    onTestFailed: (result: ITestFailure) => void
+    onTestFailed: (result: ITestFailure) => void,
+    testOutputBasePath: string
 ): Promise<ITestResult> => {
     const logger = new ConsoleProxy();
     logger.activate();
 
     try {
-        const context: ITestContext = { settings: settings };
+        const writeToFile = async (filePath: string, content: string): Promise<string> => {
+            const outPath = path.join(testOutputBasePath, filePath);
+            const fileDir = path.dirname(outPath);
+            await mkdir(fileDir, {
+                recursive: true,
+            });
+
+            await writeIterableToFile([content], outPath);
+
+            return outPath;
+        };
+
+        const context: ITestContext = { settings: settings, writeToFile: writeToFile };
         await t.test(context);
         const result: ITestSuccess = { kind: TestResult.success, name: t.name };
         onTestSucceeded(result);
@@ -128,12 +177,16 @@ const runAll = async (
     tests: Array<ITestEntry>,
     settings: ITestSettings,
     onTestSucceeded: (result: ITestSuccess) => void,
-    onTestFailed: (result: ITestFailure) => void
+    onTestFailed: (result: ITestFailure) => void,
+    testOutputBasePath: string
 ): Promise<Array<ITestResult>> => {
     const results: Array<ITestResult> = [];
 
     for (var i = 0; i < tests.length; i++) {
-        const result = await runTest(tests[i], settings, onTestSucceeded, onTestFailed);
+        const test = tests[i];
+        const basePath = path.join(testOutputBasePath, test.name);
+
+        const result = await runTest(test, settings, onTestSucceeded, onTestFailed, basePath);
         results.push(result);
     }
     return results;
@@ -211,7 +264,15 @@ export class TestRepository {
             bar1.update({ failed: failedCount });
         };
 
-        const results: Array<ITestResult> = await runAll(filteredTests, settings, onTestSucceeded, onTestFailed);
+        const now = DateTime.now().toString();
+        const testOutputBasePath = path.join(`/tmp/bisect-tests/${now}`);
+        const results: Array<ITestResult> = await runAll(
+            filteredTests,
+            settings,
+            onTestSucceeded,
+            onTestFailed,
+            testOutputBasePath
+        );
         bar1.stop();
         printSummary(results);
 
