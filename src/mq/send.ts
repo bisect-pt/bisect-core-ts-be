@@ -35,9 +35,11 @@ const createQueuePipe = async (brokerUrl: string, queue: types.IQueueInfo): Prom
     await channel.assertQueue(queue.name, queue.options);
 
     const send = (m: types.AnyQueueMessage) => {
-        const { msg, persistent } = m;
+        const { msg, persistent, expirationMs } = m;
+
         channel.sendToQueue(queue.name, Buffer.from(JSON.stringify(msg)), {
             persistent: persistent,
+            expiration: expirationMs,
         });
     };
 
