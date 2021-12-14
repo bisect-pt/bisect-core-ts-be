@@ -18,6 +18,7 @@ export interface IExchangeInfo {
 export interface QueueMessage<Content> {
     msg: Content;
     persistent: boolean;
+    expirationMs?: number; // Optional time-to-live for the message
 }
 
 export type AnyQueueMessage = QueueMessage<any>;
